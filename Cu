@@ -1,0 +1,104 @@
+-- Criando o módulo do player
+local player = {}
+
+-- Carregando as bibliotecas bump e anim8
+local bump = require "bump"
+local anim8 = require "anim8"
+
+-- Definindo as constantes do player
+local PLAYER_WIDTH = 32 -- largura do player em pixels
+local PLAYER_HEIGHT = 64 -- altura do player em pixels
+local PLAYER_SPEED = 200 -- velocidade horizontal do player em pixels por segundo
+local PLAYER_JUMP = -400 -- impulso vertical do player em pixels por segundo ao pular
+local GRAVITY = 800 -- aceleração vertical do player em pixels por segundo ao cair
+
+-- Definindo as variáveis do player
+local x, y = 100, 100 -- posição inicial do player
+local vx, vy = 0, 0 -- velocidade inicial do player
+local isGrounded = false -- se o player está no chão ou não
+local direction = 1 -- direção que o player está olhando (1 para direita, -1 para esquerda)
+local sprite -- imagem do sprite do player
+local grid -- grade de animação do sprite
+local animation -- animação atual do sprite
+
+-- Função para carregar os recursos do player
+function player.load()
+  -- Carregando a imagem do sprite do player
+  sprite = love.graphics.newImage("player.png")
+  
+  -- Criando a grade de animação do sprite
+  grid = anim8.newGrid(PLAYER_WIDTH, PLAYER_HEIGHT, sprite:getWidth(), sprite:getHeight())
+  
+  -- Criando as animações do sprite
+  local idleFrames = grid("1-4", 1) -- frames da animação de parado
+  local walkFrames = grid("1-8", 2) -- frames da animação de andando
+  local jumpFrames = grid("1-4", 3) -- frames da animação de pulando
+  
+  -- Inicializando a animação atual com a de parado
+  animation = anim8.newAnimation(idleFrames, 0.1)
+end
+
+-- Função para atualizar o estado do player
+function player.update(dt, world)
+  -- Recebendo o input do teclado
+  local left = love.keyboard.isDown("left") or love.keyboard.isDown("a") -- se a tecla esquerda ou a está pressionada
+  local right = love.keyboard.isDown("right") or love.keyboard.isDown("d") -- se a tecla direita ou d está pressionada
+  local jump = love.keyboard.isDown("up") or love.keyboard.isDown("w") or love.keyboard.isDown("space") -- se a tecla cima, w ou espaço está pressionada
+  
+  -- Atualizando a velocidade horizontal do player de acordo com o input
+  if left then -- se está andando para esquerda
+    vx = -PLAYER_SPEED -- velocidade negativa
+    direction = -1 -- direção esquerda
+  elseif right then -- se está andando para direita
+    vx = PLAYER_SPEED -- velocidade positiva
+    direction = 1 -- direção direita
+  else -- se não está andando
+    vx = 0 -- velocidade zero
+  end
+  
+  -- Atualizando a velocidade vertical do player de acordo com o input e a gravidade
+  if jump and isGrounded then -- se está pulando e está no chão
+    vy = PLAYER_JUMP -- impulso negativo
+    isGrounded = false -- não está mais no chão
+  end
+  
+  vy = vy + GRAVITY * dt -- aceleração positiva
+  
+  -- Movendo o player no mundo e verificando colisões
+  local cols, len -- variáveis para armazenar as colisões e o número delas
+  x, y, cols, len = world:move(player, x + vx * dt, y + vy * dt) -- movendo o player e obtendo as colisões
+  
+  for i=1,len do -- percorrendo as colisões
+    local col = cols[i] -- obtendo a colisão atual
+    
+    if col.normal.y == -1 then -- se a colisão foi por cima
+      isGrounded = true -- está no chão
+      vy = 0 -- velocidade vertical zero
+    elseif col.normal.y == 1 then -- se a colisão foi por baixo
+      vy = 0 -- velocidade vertical zero
+    end
+  end
+  
+  -- Atualizando a animação do player de acordo com o estado
+  if isGrounded then -- se está no chão
+    if vx == 0 then -- se está parado
+      animation = anim8.newAnimation(grid("1-4", 1), 0.1) -- animação de parado
+    else -- se está andando
+      animation = anim8.newAnimation(grid("1-8", 2), 0.1) -- animação de andando
+    end
+  else -- se está no ar
+    animation = anim8.newAnimation(grid("1-4", 3), 0.1) -- animação de pulando
+  end
+  
+  -- Atualizando a animação do player
+  animation:update(dt)
+end
+
+-- Função para desenhar o player na tela
+function player.draw()
+  -- Desenhando a animação do player na posição e direção corretas
+  animation:draw(sprite, x, y, 0, direction, 1, PLAYER_WIDTH / 2, PLAYER_HEIGHT / 2)
+end
+
+-- Retornando o módulo do player
+return player
